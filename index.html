@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Font panel — filter scroll micro-interactions</title>
+<style>
+  :root {
+    /* --- tokens pulled from the SWAN design system used in the Figma file --- */
+    --sem-color-bg-standard: #ffffff;
+    --sem-color-bg-strong: #f3f3f3;
+    --sem-color-bg-container: #ffffff;
+    --sem-color-border-standard: #d3d3d3;
+    --sem-color-border-action: #0000002b;      /* rgba(0,0,0,0.17) */
+    --sem-color-border-partition: #d3d3d3;
+    --sem-color-text-standard: #000000;
+    --sem-color-text-subtle: #6c6c6c;
+    --sem-color-text-placeholder: #6c6c6c;
+    --sem-color-bg-selected-blue: #e5f5fd;
+    --sem-color-border-selected-blue: #1c8bc3;
+    --sem-focus-color-outer: #0c72a9;
+
+    --comp-btn-secondary-bg: #ffffff;
+    --comp-btn-secondary-bg-hover: #f2f2f2;
+    --comp-btn-secondary-bg-active: #e6e6e6;
+    --comp-btn-secondary-border: #00000042;     /* rgba(0,0,0,0.26) */
+    --comp-btn-secondary-border-hover: rgba(0,0,0,0.30);
+    --comp-btn-secondary-border-active: rgba(0,0,0,0.40);
+
+    --sem-border-radius-action: 8px;
+    --sem-border-width-action: 1px;
+    --sem-border-width-selected: 2px;
+
+    --sem-space-4: 8px;
+    --sem-space-5: 12px;
+    --sem-space-inner-action-vertical: 8px;
+    --comp-btn-space-inner-horizontal: 12px;
+
+    --font-family: -apple-system, "SF Pro", "Helvetica Neue", Arial, sans-serif;
+    --font-standard: 14px;
+    --line-standard: 21px;
+
+    --elevation-subtle: 0 2px 4px rgba(0,0,0,0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 48px 32px;
+    background: #1f2a37;
+    font-family: var(--font-family);
+    color: var(--sem-color-text-standard);
+  }
+
+  h1 { color: white; font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: #b7c0cc; font-size: 13px; margin: 0 0 40px; max-width: 680px; }
+
+  .row { margin-bottom: 56px; }
+  .row-heading { color: white; font-size: 18px; font-weight: 700; margin: 0 0 8px; }
+  .row-desc { color: #b7c0cc; font-size: 13px; margin: 0 0 20px; max-width: 640px; }
+
+  /* ---------- panel shell ---------- */
+  .panel {
+    width: 360px;
+    background: var(--sem-color-bg-container);
+    border-radius: 12px;
+    box-shadow: var(--elevation-subtle);
+    padding: 16px;
+    font-size: var(--font-standard);
+  }
+
+  .panel-title { font-size: 18px; font-weight: 700; margin: 0 0 16px; }
+
+  .search-input {
+    width: 100%;
+    height: 36px;
+    border: var(--sem-border-width-action) solid var(--sem-color-border-standard);
+    border-radius: var(--sem-border-radius-action);
+    padding: 0 12px;
+    font-size: var(--font-standard);
+    color: var(--sem-color-text-placeholder);
+    margin-bottom: 12px;
+    background: #fff;
+  }
+
+  /* ---------- filter row ---------- */
+  .filter-row-inner-wrap { overflow: hidden; position: relative; width: 100%; }
+  .filter-row { position: relative; height: 36px; }
+
+  .chip-track {
+    display: flex;
+    gap: 8px;
+    height: 36px;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    cursor: grab;
+    /* no native scroll-behavior: smooth — we drive motion ourselves with eased RAF */
+
+    /* BUGFIX: without scroll-snap, native wheel/trackpad/touch scrolling (i.e. anything
+       that isn't our JS-driven button/hold/drag path) had no chip alignment at all,
+       so it could still land mid-chip — the exact "odd" feeling this was meant to fix. */
+    scroll-snap-type: x proximity;
+
+    /* BUGFIX: dragging across the pill labels triggered native text selection instead
+       of just scrolling — looked broken while dragging. */
+    user-select: none;
+    -webkit-user-select: none;
+
+    /* BUGFIX: on touch devices, native horizontal panning fought with the custom
+       pointer-based drag handler below, causing jittery double-scrolling. Vertical
+       page scroll still passes through normally. */
+    touch-action: pan-y;
+  }
+  .chip-track::-webkit-scrollbar { display: none; }
+  .chip-track.dragging { cursor: grabbing; }
+  .chip-track.dragging .chip { pointer-events: none; } /* avoid stray hover/press flicker mid-drag */
+
+  .chip {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+    height: 36px;
+    padding: 0 var(--comp-btn-space-inner-horizontal);
+    border-radius: var(--sem-border-radius-action);
+    border: var(--sem-border-width-action) solid var(--sem-color-border-action);
+    background: #fff;
+    font-family: var(--font-family);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--sem-color-text-standard);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .chip.selected {
+    background: var(--sem-color-bg-selected-blue);
+    border: var(--sem-border-width-selected) solid var(--sem-color-border-selected-blue);
+  }
+  .chip:focus-visible { outline: 2px solid var(--sem-focus-color-outer); outline-offset: 2px; }
+
+  /* nav (chevron) buttons */
+  .nav-btn {
+    position: absolute;
+    top: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--sem-border-radius-action);
+    border: var(--sem-border-width-action) solid var(--comp-btn-secondary-border);
+    background: var(--comp-btn-secondary-bg);
+    box-shadow: inset 0 -1px 1px 0 rgba(0,0,0,0.09);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    z-index: 2;
+    transition: opacity .18s ease, transform .16s cubic-bezier(.2,.8,.3,1.2), background-color .12s ease, border-color .12s ease;
+  }
+  .nav-btn.left { left: 0; }
+  .nav-btn.right { right: 0; }
+  .nav-btn svg { width: 16px; height: 16px; pointer-events: none; }
+
+  .nav-btn:hover { background: var(--comp-btn-secondary-bg-hover); border-color: var(--comp-btn-secondary-border-hover); }
+  .nav-btn:active { background: var(--comp-btn-secondary-bg-active); border-color: var(--comp-btn-secondary-border-active); }
+  .nav-btn:focus-visible { outline: 2px solid var(--sem-focus-color-outer); outline-offset: 2px; }
+
+  /* visually-disabled (kept interactive on purpose so an attempted click can "shake" for feedback) */
+  .nav-btn[data-disabled="true"] { opacity: 0.35; cursor: not-allowed; }
+  .nav-btn[data-disabled="true"]:hover,
+  .nav-btn[data-disabled="true"]:active {
+    background: var(--comp-btn-secondary-bg);
+    border-color: var(--comp-btn-secondary-border);
+    transform: none;
+  }
+
+  @keyframes shakeKf {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(3px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60% { transform: translateX(4px); }
+  }
+  .nav-btn.shake { animation: shakeKf .32s ease; }
+
+  /* fade masks so clipped chips feel intentional, not cut off */
+  .filter-row::before, .filter-row::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 40px;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity .18s ease;
+  }
+  .filter-row::before { left: 0; background: linear-gradient(90deg, #fff, rgba(255,255,255,0)); }
+  .filter-row::after  { right: 0; background: linear-gradient(270deg, #fff, rgba(255,255,255,0)); }
+  .filter-row[data-at-start="true"]::before { opacity: 0; }
+  .filter-row[data-at-end="true"]::after { opacity: 0; }
+
+  /* =====================================================
+     VARIANT A — hover to reveal (mouse only), with a
+     directional slide + a short "linger" before hiding
+     ===================================================== */
+  .variant-a .nav-btn { opacity: 0; pointer-events: none; }
+  .variant-a .nav-btn.left { transform: translateX(-6px); }
+  .variant-a .nav-btn.right { transform: translateX(6px); }
+  .variant-a .filter-row.revealed .nav-btn {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  /* =====================================================
+     VARIANT B — permanently visible, plain
+     ===================================================== */
+  .variant-b .nav-btn { opacity: 1; }
+
+  /* =====================================================
+     VARIANT C — always visible + tactile + keyboard-visible
+     ===================================================== */
+  .variant-c .nav-btn { opacity: 1; }
+  .variant-c .nav-btn:hover { transform: scale(1.12); }
+  .variant-c .nav-btn:active { transform: scale(0.94); }
+  .variant-c .nav-btn:focus-visible { transform: scale(1.06); }
+  .variant-c .nav-btn[data-disabled="true"]:hover,
+  .variant-c .nav-btn[data-disabled="true"]:active,
+  .variant-c .nav-btn[data-disabled="true"]:focus-visible { transform: none; }
+
+  .hint { margin-top: 14px; font-size: 12px; color: #8b96a3; }
+  .hint kbd {
+    background: #2c3a4a; color: #dbe3ea; border-radius: 4px;
+    padding: 1px 5px; font-family: inherit; font-size: 11px;
+  }
+</style>
+</head>
+<body>
+
+  <h1>Font panel — horizontal filter scrolling</h1>
+  <p class="subtitle">Chip-aligned paging with a custom eased animation, press-and-hold to keep scrolling, and real drag-with-momentum on the row itself — things a static Figma frame can't demonstrate.</p>
+
+  <div class="row">
+    <p class="row-heading">A) Hover to reveal</p>
+    <p class="row-desc">Arrows are hidden at rest. Hover over the row to reveal them with a slide+fade (with a short linger before hiding so they don't flicker), click/hold to scroll, or just drag the row.</p>
+    <div class="panel variant-a">
+      <p class="panel-title">Fonts</p>
+      <input class="search-input" placeholder="Search fonts" />
+      <div class="filter-row-inner-wrap">
+        <div class="filter-row" data-at-start="true">
+          <button class="nav-btn left" aria-label="Scroll filters left"></button>
+          <div class="chip-track">
+            <button class="chip selected">All</button>
+            <button class="chip">In this project</button>
+            <button class="chip">Traditional</button>
+            <button class="chip">Modern</button>
+            <button class="chip">Script</button>
+            <button class="chip">Playful</button>
+            <button class="chip">Decorative</button>
+          </div>
+          <button class="nav-btn right" aria-label="Scroll filters right"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <p class="row-heading">B) Permanently there</p>
+    <p class="row-desc">Arrows always visible. Click pages one chip cleanly into view (never cuts one in half); press and hold to keep scrolling; drag the row for momentum-based scrolling with a rubber-band edge.</p>
+    <div class="panel variant-b">
+      <p class="panel-title">Fonts</p>
+      <input class="search-input" placeholder="Search fonts" />
+      <div class="filter-row-inner-wrap">
+        <div class="filter-row" data-at-start="true">
+          <button class="nav-btn left" aria-label="Scroll filters left"></button>
+          <div class="chip-track">
+            <button class="chip selected">All</button>
+            <button class="chip">In this project</button>
+            <button class="chip">Traditional</button>
+            <button class="chip">Modern</button>
+            <button class="chip">Script</button>
+            <button class="chip">Playful</button>
+            <button class="chip">Decorative</button>
+          </div>
+          <button class="nav-btn right" aria-label="Scroll filters right"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <p class="row-heading">C) Always visible + tactile / keyboard-accessible</p>
+    <p class="row-desc">Same enhanced engine as B, plus a livelier hover/press pop and a real focus ring when reached via keyboard.</p>
+    <div class="panel variant-c">
+      <p class="panel-title">Fonts</p>
+      <input class="search-input" placeholder="Search fonts" />
+      <div class="filter-row-inner-wrap">
+        <div class="filter-row" data-at-start="true">
+          <button class="nav-btn left" aria-label="Scroll filters left"></button>
+          <div class="chip-track">
+            <button class="chip selected">All</button>
+            <button class="chip">In this project</button>
+            <button class="chip">Traditional</button>
+            <button class="chip">Modern</button>
+            <button class="chip">Script</button>
+            <button class="chip">Playful</button>
+            <button class="chip">Decorative</button>
+          </div>
+          <button class="nav-btn right" aria-label="Scroll filters right"></button>
+        </div>
+      </div>
+      <p class="hint">Try <kbd>Tab</kbd> then <kbd>Enter</kbd> / <kbd>Space</kbd> — fully keyboard operable, no mouse required.</p>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const chevronLeft = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 6l-6 6 6 6" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const chevronRight = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 6l6 6-6 6" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  document.querySelectorAll('.nav-btn.left').forEach(b => b.innerHTML = chevronLeft);
+  document.querySelectorAll('.nav-btn.right').forEach(b => b.innerHTML = chevronRight);
+
+  const EASE_OUT_CUBIC = t => 1 - Math.pow(1 - t, 3);
+
+  // ---- custom eased scroll animation (replaces native scrollBy smooth-scroll) ----
+  function animateScrollTo(track, target, duration = 380) {
+    cancelAnimationFrame(track._raf);
+    const start = track.scrollLeft;
+    const delta = target - start;
+    if (Math.abs(delta) < 0.5) return Promise.resolve();
+    const t0 = performance.now();
+    return new Promise(resolve => {
+      function step(now) {
+        const t = Math.min(1, (now - t0) / duration);
+        track.scrollLeft = start + delta * EASE_OUT_CUBIC(t);
+        if (t < 1) {
+          track._raf = requestAnimationFrame(step);
+        } else {
+          resolve();
+        }
+      }
+      track._raf = requestAnimationFrame(step);
+    });
+  }
+
+  function getChips(track) { return Array.from(track.querySelectorAll('.chip')); }
+
+  function chipLeft(track, chip) {
+    return chip.getBoundingClientRect().left - track.getBoundingClientRect().left + track.scrollLeft;
+  }
+
+  // find the exact scroll position that brings the next/prev chip *fully* into view
+  // (never leaves a chip awkwardly cut in half at the edge)
+  function pageTarget(track, dir) {
+    const max = track.scrollWidth - track.clientWidth;
+    const viewStart = track.scrollLeft;
+    const viewEnd = track.scrollLeft + track.clientWidth;
+    const EPS = 2;
+    const chips = getChips(track);
+    if (dir === 1) {
+      for (const chip of chips) {
+        const left = chipLeft(track, chip);
+        const right = left + chip.offsetWidth;
+        if (right > viewEnd + EPS) return Math.min(left, max);
+      }
+      return max;
+    } else {
+      for (let i = chips.length - 1; i >= 0; i--) {
+        const left = chipLeft(track, chips[i]);
+        if (left < viewStart - EPS) {
+          const right = left + chips[i].offsetWidth;
+          return Math.max(right - track.clientWidth, 0);
+        }
+      }
+      return 0;
+    }
+  }
+
+  function nearestChipTarget(track, approx) {
+    const max = track.scrollWidth - track.clientWidth;
+    let best = 0, bestDist = Infinity;
+    for (const chip of getChips(track)) {
+      const left = chipLeft(track, chip);
+      const dist = Math.abs(left - approx);
+      if (dist < bestDist) { bestDist = dist; best = left; }
+    }
+    return Math.max(0, Math.min(max, best));
+  }
+
+  function shake(btn) {
+    btn.classList.remove('shake');
+    requestAnimationFrame(() => btn.classList.add('shake'));
+  }
+
+  document.querySelectorAll('.filter-row').forEach(row => {
+    const track = row.querySelector('.chip-track');
+    const left = row.querySelector('.nav-btn.left');
+    const right = row.querySelector('.nav-btn.right');
+    let isHolding = false, justHeld = false, holdTimer = null, holdRAF = null;
+
+    function updateState() {
+      const max = track.scrollWidth - track.clientWidth;
+      const atStart = track.scrollLeft <= 1;
+      const atEnd = track.scrollLeft >= max - 1;
+      row.dataset.atStart = atStart;
+      row.dataset.atEnd = atEnd;
+      left.dataset.disabled = String(atStart);
+      right.dataset.disabled = String(atEnd);
+      left.setAttribute('aria-disabled', String(atStart));
+      right.setAttribute('aria-disabled', String(atEnd));
+    }
+
+    // ---- press-and-hold continuous scroll (real "slider" behavior), snaps to a chip on release ----
+    function startHold(dir, btn) {
+      if (btn.dataset.disabled === 'true') { shake(btn); return; }
+      isHolding = false;
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        isHolding = true;
+        const speed = 460; // px/sec
+        let last = performance.now();
+        function loop(now) {
+          const dt = (now - last) / 1000; last = now;
+          const max = track.scrollWidth - track.clientWidth;
+          track.scrollLeft = Math.max(0, Math.min(max, track.scrollLeft + dir * speed * dt));
+          updateState();
+          if ((dir === 1 && track.scrollLeft < max - 0.5) || (dir === -1 && track.scrollLeft > 0.5)) {
+            holdRAF = requestAnimationFrame(loop);
+          }
+        }
+        holdRAF = requestAnimationFrame(loop);
+      }, 360);
+    }
+    function endHold() {
+      clearTimeout(holdTimer);
+      cancelAnimationFrame(holdRAF);
+      if (isHolding) {
+        justHeld = true;
+        animateScrollTo(track, nearestChipTarget(track, track.scrollLeft), 240).then(updateState);
+        setTimeout(() => { justHeld = false; }, 50);
+      }
+      isHolding = false;
+    }
+
+    [left, right].forEach((btn, i) => {
+      const dir = i === 0 ? -1 : 1;
+      btn.addEventListener('pointerdown', () => startHold(dir, btn));
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(evt => btn.addEventListener(evt, endHold));
+      btn.addEventListener('click', () => {
+        if (justHeld) return; // the hold-release already snapped it — don't also page
+        if (btn.dataset.disabled === 'true') { shake(btn); return; }
+        animateScrollTo(track, pageTarget(track, dir), 380).then(updateState);
+      });
+    });
+
+    // ---- drag-to-scroll with momentum + rubber-band edges ----
+    let dragging = false, moved = false, startX = 0, startScroll = 0, lastX = 0, lastT = 0, vel = 0;
+    track.addEventListener('pointerdown', (e) => {
+      dragging = true; moved = false;
+      startX = e.clientX; startScroll = track.scrollLeft;
+      lastX = e.clientX; lastT = performance.now(); vel = 0;
+      cancelAnimationFrame(track._raf);
+      try { track.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    track.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 4) { moved = true; track.classList.add('dragging'); }
+      if (!moved) return;
+      const max = track.scrollWidth - track.clientWidth;
+      let next = startScroll - dx;
+      if (next < 0) next = next * 0.4;            // rubber band past start
+      if (next > max) next = max + (next - max) * 0.4; // rubber band past end
+      track.scrollLeft = next;
+      const now = performance.now();
+      const dt = now - lastT;
+      if (dt > 0) vel = (e.clientX - lastX) / dt;  // px per ms
+      lastX = e.clientX; lastT = now;
+      updateState();
+    });
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      track.classList.remove('dragging');
+      const max = track.scrollWidth - track.clientWidth;
+      if (track.scrollLeft < 0 || track.scrollLeft > max) {
+        animateScrollTo(track, Math.max(0, Math.min(max, track.scrollLeft)), 260).then(updateState);
+      } else if (moved) {
+        const momentumTarget = track.scrollLeft - vel * 160; // fling distance from velocity
+        animateScrollTo(track, nearestChipTarget(track, momentumTarget), 340).then(updateState);
+      }
+      if (moved) { row._suppressClick = true; setTimeout(() => { row._suppressClick = false; }, 80); }
+    }
+    track.addEventListener('pointerup', endDrag);
+    track.addEventListener('pointercancel', endDrag);
+
+    track.addEventListener('scroll', updateState);
+    window.addEventListener('resize', updateState);
+    updateState();
+  });
+
+  // ---- Variant A: hover-reveal with directional slide + short linger before hiding ----
+  document.querySelectorAll('.variant-a .filter-row').forEach(row => {
+    let hideTimer = null;
+    function reveal() { clearTimeout(hideTimer); row.classList.add('revealed'); }
+    function scheduleHide() { hideTimer = setTimeout(() => row.classList.remove('revealed'), 180); }
+    row.addEventListener('mouseenter', reveal);
+    row.addEventListener('mouseleave', scheduleHide);
+    row.addEventListener('focusin', reveal);
+    row.addEventListener('focusout', scheduleHide);
+  });
+
+  // ---- chip selection ----
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const row = chip.closest('.filter-row');
+      if (row && row._suppressClick) return; // ignore the click that ends a drag
+      const group = chip.closest('.chip-track');
+      group.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+})();
+</script>
+</body>
+</html>
