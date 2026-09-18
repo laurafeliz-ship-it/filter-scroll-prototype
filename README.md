@@ -53,6 +53,33 @@ focusable/clickable via keyboard even when visually disabled. Fine for a
 prototype; swap to a proper disabled/`aria-disabled` + `tabindex="-1"` pattern
 before this goes near production.
 
+## Bugs found and fixed along the way
+
+- **Vertical clipping on hover/press/focus (Prototype C).** The row's height
+  exactly equalled the button height with zero vertical slack, so any
+  focus-visible outline or the hover/press scale-up got clipped top and bottom.
+  Fixed by growing the row 16px taller (8px clearance each side) and vertically
+  centering its contents — covers the worst case (hovering an already-focused
+  button, ~6px of combined outline + scale growth).
+- **Same clipping bug, different element.** Individual chips had the identical
+  risk from `chip-track`'s own scroll container — and per the CSS spec, a
+  horizontally-scrollable element (`overflow-x: auto`) forces the other axis to
+  also clip, even if you never asked for `overflow-y`. Fixed the same way (extra
+  height + `align-items: center`), since disabling the clipping outright isn't
+  possible while keeping the row scrollable.
+- **CSS specificity bug: disabled arrows didn't actually look disabled in B/C.**
+  `.nav-btn[data-disabled="true"] { opacity: 0.35 }` had the *exact same*
+  specificity as `.variant-b .nav-btn { opacity: 1 }` / `.variant-c .nav-btn
+  { opacity: 1 }`, and those variant rules were declared later in the file — so
+  they silently won every time. The logic (JS `dataset.disabled`, shake
+  feedback, scroll blocking) was always correct; only the visual opacity was
+  wrong. Fixed by adding a `button` type-selector to bump specificity so it wins
+  regardless of source order.
+- **Missing accessible labels.** The search inputs had a placeholder but no
+  `aria-label`, and the filter chips never communicated their selected state to
+  assistive tech (no `aria-pressed`) — both flagged by automated accessibility
+  checks. Fixed.
+
 ## Design tokens
 
 Colors, radius, spacing, and typography are pulled from the SWAN tokens used in

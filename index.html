@@ -85,13 +85,23 @@
   }
 
   /* ---------- filter row ---------- */
-  .filter-row-inner-wrap { overflow: hidden; position: relative; width: 100%; }
-  .filter-row { position: relative; height: 36px; }
+  /* BUGFIX (part 2 of the clipping issue): overflow-x:hidden alone is enough to hide
+     horizontally-scrolled-off chips; overflow-y:visible means this outer wrapper no
+     longer clips the nav buttons vertically (see the row-height comment below for
+     why there was no vertical slack in the first place). */
+  .filter-row-inner-wrap { overflow-x: hidden; overflow-y: visible; position: relative; width: 100%; }
+  /* BUGFIX: row/track height used to exactly equal the chip/button height (36px),
+     leaving *zero* vertical slack. Any focus-visible outline (outline-width 2 +
+     outline-offset 2 = 4px) or variant C's hover/focus scale-up (~2-3px) had nowhere
+     to go but into the clip boundary. +16px of height (8px above/below) gives enough
+     clearance for the worst case (hovering an already-focused button, ~6px). */
+  .filter-row { position: relative; height: 52px; }
 
   .chip-track {
     display: flex;
+    align-items: center; /* vertically centers the 36px-tall chips within the taller track */
     gap: 8px;
-    height: 36px;
+    height: 52px;
     width: 100%;
     overflow-x: auto;
     scrollbar-width: none;
@@ -142,7 +152,7 @@
   /* nav (chevron) buttons */
   .nav-btn {
     position: absolute;
-    top: 0;
+    top: 8px; /* centers the 36px button within the now-52px-tall row */
     width: 36px;
     height: 36px;
     border-radius: var(--sem-border-radius-action);
@@ -171,9 +181,14 @@
   .nav-btn:focus-visible { outline: 2px solid var(--sem-focus-color-outer); outline-offset: 2px; }
 
   /* visually-disabled (kept interactive on purpose so an attempted click can "shake" for feedback) */
-  .nav-btn[data-disabled="true"] { opacity: 0.35; cursor: not-allowed; }
-  .nav-btn[data-disabled="true"]:hover,
-  .nav-btn[data-disabled="true"]:active {
+  /* BUGFIX: this had the same specificity as `.variant-b .nav-btn { opacity: 1 }` /
+     `.variant-c .nav-btn { opacity: 1 }`, and those are declared later in the file,
+     so they silently won — disabled arrows never actually looked disabled in B/C.
+     The `button` type-selector bumps specificity so this reliably wins regardless
+     of where the variant blocks are declared. */
+  button.nav-btn[data-disabled="true"] { opacity: 0.35; cursor: not-allowed; }
+  button.nav-btn[data-disabled="true"]:hover,
+  button.nav-btn[data-disabled="true"]:active {
     background: var(--comp-btn-secondary-bg);
     border-color: var(--comp-btn-secondary-border);
     transform: none;
@@ -248,7 +263,7 @@
     <p class="row-desc">Arrows are hidden at rest. Hover over the row to reveal them with a slide+fade (with a short linger before hiding so they don't flicker), click/hold to scroll, or just drag the row.</p>
     <div class="panel variant-a">
       <p class="panel-title">Fonts</p>
-      <input class="search-input" placeholder="Search fonts" />
+      <input class="search-input" placeholder="Search fonts" aria-label="Search fonts" />
       <div class="filter-row-inner-wrap">
         <div class="filter-row" data-at-start="true">
           <button class="nav-btn left" aria-label="Scroll filters left"></button>
@@ -272,7 +287,7 @@
     <p class="row-desc">Arrows always visible. Click pages one chip cleanly into view (never cuts one in half); press and hold to keep scrolling; drag the row for momentum-based scrolling with a rubber-band edge.</p>
     <div class="panel variant-b">
       <p class="panel-title">Fonts</p>
-      <input class="search-input" placeholder="Search fonts" />
+      <input class="search-input" placeholder="Search fonts" aria-label="Search fonts" />
       <div class="filter-row-inner-wrap">
         <div class="filter-row" data-at-start="true">
           <button class="nav-btn left" aria-label="Scroll filters left"></button>
@@ -296,7 +311,7 @@
     <p class="row-desc">Same enhanced engine as B, plus a livelier hover/press pop and a real focus ring when reached via keyboard.</p>
     <div class="panel variant-c">
       <p class="panel-title">Fonts</p>
-      <input class="search-input" placeholder="Search fonts" />
+      <input class="search-input" placeholder="Search fonts" aria-label="Search fonts" />
       <div class="filter-row-inner-wrap">
         <div class="filter-row" data-at-start="true">
           <button class="nav-btn left" aria-label="Scroll filters left"></button>
@@ -514,13 +529,20 @@
   });
 
   // ---- chip selection ----
+  // BUGFIX: chips never communicated their selected state to assistive tech
+  // (no aria-pressed at all) — undercut variant C's keyboard-accessible claim.
   document.querySelectorAll('.chip').forEach(chip => {
+    chip.setAttribute('aria-pressed', chip.classList.contains('selected') ? 'true' : 'false');
     chip.addEventListener('click', () => {
       const row = chip.closest('.filter-row');
       if (row && row._suppressClick) return; // ignore the click that ends a drag
       const group = chip.closest('.chip-track');
-      group.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      group.querySelectorAll('.chip').forEach(c => {
+        c.classList.remove('selected');
+        c.setAttribute('aria-pressed', 'false');
+      });
       chip.classList.add('selected');
+      chip.setAttribute('aria-pressed', 'true');
     });
   });
 })();
