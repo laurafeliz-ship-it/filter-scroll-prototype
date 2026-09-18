@@ -157,8 +157,13 @@
     z-index: 2;
     transition: opacity .18s ease, transform .16s cubic-bezier(.2,.8,.3,1.2), background-color .12s ease, border-color .12s ease;
   }
-  .nav-btn.left { left: 0; }
-  .nav-btn.right { right: 0; }
+  /* BUGFIX: the row sits inside an overflow:hidden wrapper and these buttons are
+     flush against its left/right clip edge. Scaling from the default center origin
+     (used by variant C's hover/press/focus pop) pushed part of the button past that
+     edge and got it clipped. Anchoring the origin to the outer edge makes it grow
+     inward instead, so it never crosses the clip boundary. */
+  .nav-btn.left { left: 0; transform-origin: left center; }
+  .nav-btn.right { right: 0; transform-origin: right center; }
   .nav-btn svg { width: 16px; height: 16px; pointer-events: none; }
 
   .nav-btn:hover { background: var(--comp-btn-secondary-bg-hover); border-color: var(--comp-btn-secondary-border-hover); }
