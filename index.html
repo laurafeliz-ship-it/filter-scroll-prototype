@@ -233,9 +233,18 @@
      VARIANT A — hover to reveal (mouse only), with a
      directional slide + a short "linger" before hiding
      ===================================================== */
-  .variant-a .nav-btn { opacity: 0; pointer-events: none; }
-  .variant-a .nav-btn.left { transform: translateX(-6px); }
-  .variant-a .nav-btn.right { transform: translateX(6px); }
+  /* BUGFIX: a 6px shift completing in the same .16s as the fade was too subtle
+     to read as directional motion — it just looked like a plain fade. A bigger
+     distance (18px) and a longer, slightly slower-settling transform transition
+     (scoped to this variant only, so it doesn't affect B/C's timing) makes the
+     slide actually visible rather than implied. */
+  .variant-a .nav-btn {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .32s cubic-bezier(.16, 1, .3, 1);
+  }
+  .variant-a .nav-btn.left { transform: translateX(-18px); }
+  .variant-a .nav-btn.right { transform: translateX(18px); }
   .variant-a .filter-row.revealed .nav-btn {
     opacity: 1;
     pointer-events: auto;
