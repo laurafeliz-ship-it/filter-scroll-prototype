@@ -196,18 +196,14 @@
   .nav-btn:active { background: var(--comp-btn-secondary-bg-active); border-color: var(--comp-btn-secondary-border-active); }
   .nav-btn:focus-visible { outline: 2px solid var(--sem-focus-color-outer); outline-offset: 2px; }
 
-  /* visually-disabled (kept interactive on purpose so an attempted click can "shake" for feedback) */
-  /* BUGFIX: this had the same specificity as `.variant-b .nav-btn { opacity: 1 }` /
-     `.variant-c .nav-btn { opacity: 1 }`, and those are declared later in the file,
-     so they silently won — disabled arrows never actually looked disabled in B/C.
-     The `button` type-selector bumps specificity so this reliably wins regardless
-     of where the variant blocks are declared. */
-  button.nav-btn[data-disabled="true"] { opacity: 0.35; cursor: not-allowed; }
-  button.nav-btn[data-disabled="true"]:hover,
-  button.nav-btn[data-disabled="true"]:active {
-    background: var(--comp-btn-secondary-bg);
-    border-color: var(--comp-btn-secondary-border);
-    transform: none;
+  /* An arrow with nothing to scroll toward is fully hidden, not just dimmed —
+     e.g. no left arrow at rest (nothing to its left yet), no right arrow once
+     you've reached the last chip. !important guarantees this wins over every
+     variant's own `opacity: 1` rule regardless of specificity/source order —
+     "nothing to scroll to" always overrides "this variant shows arrows". */
+  button.nav-btn[data-disabled="true"] {
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 
   @keyframes shakeKf {
@@ -254,13 +250,14 @@
   /* =====================================================
      VARIANT C — always visible + tactile + keyboard-visible
      ===================================================== */
+  /* No hover/active/focus overrides need a disabled-state exception here anymore —
+     pointer-events:none makes hover/active unreachable, and the JS below removes
+     the button from the tab order (tabindex="-1") whenever it's hidden, so
+     focus-visible can't land on it either. */
   .variant-c .nav-btn { opacity: 1; }
   .variant-c .nav-btn:hover { transform: scale(1.12); }
   .variant-c .nav-btn:active { transform: scale(0.94); }
   .variant-c .nav-btn:focus-visible { transform: scale(1.06); }
-  .variant-c .nav-btn[data-disabled="true"]:hover,
-  .variant-c .nav-btn[data-disabled="true"]:active,
-  .variant-c .nav-btn[data-disabled="true"]:focus-visible { transform: none; }
 
   .hint { margin-top: 14px; font-size: 12px; color: #8b96a3; }
   .hint kbd {
@@ -442,6 +439,11 @@
       right.dataset.disabled = String(atEnd);
       left.setAttribute('aria-disabled', String(atStart));
       right.setAttribute('aria-disabled', String(atEnd));
+      // Fully hidden (opacity:0 + pointer-events:none via CSS) also needs removing
+      // from the keyboard tab order — otherwise Tab could still land focus on an
+      // invisible button.
+      if (atStart) left.setAttribute('tabindex', '-1'); else left.removeAttribute('tabindex');
+      if (atEnd) right.setAttribute('tabindex', '-1'); else right.removeAttribute('tabindex');
     }
 
     // ---- press-and-hold continuous scroll (real "slider" behavior), snaps to a chip on release ----
