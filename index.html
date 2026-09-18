@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Font panel — filter scroll micro-interactions</title>
+<!-- BUGFIX: restoring the per-category font previews from the Figma source — each
+     category chip (Traditional/Modern/Script/Playful/Decorative) is meant to render
+     its own name in a font representative of that style, not the generic UI font. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500&family=Poppins:wght@500&family=Sacramento&family=Baloo+2:wght@500&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
 <style>
   :root {
     /* --- tokens pulled from the SWAN design system used in the Figma file --- */
@@ -148,6 +154,16 @@
     border: var(--sem-border-width-selected) solid var(--sem-color-border-selected-blue);
   }
   .chip:focus-visible { outline: 2px solid var(--sem-focus-color-outer); outline-offset: 2px; }
+
+  /* Per-category font previews, matching the Figma source (each chip renders its
+     category name in a font representative of that style). "All" and "In this
+     project" are meta-filters, not font categories, so they keep the standard UI
+     font. Order matches the fixed chip order used in every row. */
+  .chip-track .chip:nth-child(3) { font-family: 'EB Garamond', serif; font-weight: 500; }  /* Traditional */
+  .chip-track .chip:nth-child(4) { font-family: 'Poppins', sans-serif; font-weight: 500; } /* Modern */
+  .chip-track .chip:nth-child(5) { font-family: 'Sacramento', cursive; font-weight: 400; } /* Script */
+  .chip-track .chip:nth-child(6) { font-family: 'Baloo 2', cursive; font-weight: 500; }    /* Playful — Figma's source font ("Boyrun") isn't on Google Fonts; this is the closest playful substitute */
+  .chip-track .chip:nth-child(7) { font-family: 'UnifrakturMaguntia', cursive; font-weight: 400; } /* Decorative */
 
   /* nav (chevron) buttons */
   .nav-btn {
