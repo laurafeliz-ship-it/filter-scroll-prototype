@@ -230,25 +230,18 @@
   .filter-row[data-at-end="true"]::after { opacity: 0; }
 
   /* =====================================================
-     VARIANT A — hover to reveal (mouse only), with a
-     directional slide + a short "linger" before hiding
+     VARIANT A — hover to reveal (mouse only): a quick fade,
+     no slide, with a short "linger" before hiding (in the JS)
+     so it doesn't flicker on fast mouse movement.
      ===================================================== */
-  /* BUGFIX: a 6px shift completing in the same .16s as the fade was too subtle
-     to read as directional motion — it just looked like a plain fade. A bigger
-     distance (18px) and a longer, slightly slower-settling transform transition
-     (scoped to this variant only, so it doesn't affect B/C's timing) makes the
-     slide actually visible rather than implied. */
   .variant-a .nav-btn {
     opacity: 0;
     pointer-events: none;
-    transition: opacity .18s ease, transform .32s cubic-bezier(.16, 1, .3, 1);
+    transition: opacity .12s ease;
   }
-  .variant-a .nav-btn.left { transform: translateX(-18px); }
-  .variant-a .nav-btn.right { transform: translateX(18px); }
   .variant-a .filter-row.revealed .nav-btn {
     opacity: 1;
     pointer-events: auto;
-    transform: translateX(0);
   }
 
   /* =====================================================
@@ -282,7 +275,7 @@
 
   <div class="row">
     <p class="row-heading">A) Hover to reveal</p>
-    <p class="row-desc">Arrows are hidden at rest. Hover over the row to reveal them with a slide+fade (with a short linger before hiding so they don't flicker), click/hold to scroll, or just drag the row.</p>
+    <p class="row-desc">Arrows are hidden at rest. Hover over the row to reveal them with a quick fade (with a short linger before hiding so they don't flicker), click/hold to scroll, or just drag the row.</p>
     <div class="panel variant-a">
       <p class="panel-title">Fonts</p>
       <input class="search-input" placeholder="Search fonts" aria-label="Search fonts" />
