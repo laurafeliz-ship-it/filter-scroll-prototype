@@ -215,17 +215,23 @@
   .nav-btn.shake { animation: shakeKf .32s ease; }
 
   /* fade masks so clipped chips feel intentional, not cut off */
+  /* BUGFIX: this was only 40px wide — almost exactly the arrow's own 36px width —
+     so the fade was entirely hidden behind the arrow's opaque background, with
+     maybe 4px of it ever visible. Widened to 72px so a real chunk of the fade
+     (~36px) shows past the arrow's edge, softly washing out whatever chip text
+     is peeking out there instead of the text just getting hard-clipped by the
+     arrow. */
   .filter-row::before, .filter-row::after {
     content: "";
     position: absolute;
     top: 0; bottom: 0;
-    width: 40px;
+    width: 72px;
     pointer-events: none;
     z-index: 1;
     transition: opacity .18s ease;
   }
-  .filter-row::before { left: 0; background: linear-gradient(90deg, #fff, rgba(255,255,255,0)); }
-  .filter-row::after  { right: 0; background: linear-gradient(270deg, #fff, rgba(255,255,255,0)); }
+  .filter-row::before { left: 0; background: linear-gradient(90deg, #fff 30%, rgba(255,255,255,0)); }
+  .filter-row::after  { right: 0; background: linear-gradient(270deg, #fff 30%, rgba(255,255,255,0)); }
   .filter-row[data-at-start="true"]::before { opacity: 0; }
   .filter-row[data-at-end="true"]::after { opacity: 0; }
 
